@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Agent Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        body { background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%); }
+        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); }
+        .glow { box-shadow: 0 0 30px rgba(99, 102, 241, 0.4); }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .typing span { animation: bounce 1.4s infinite; display:inline-block; width:8px; height:8px; background:#6366f1; border-radius:50%; margin:0 2px; }
+        .typing span:nth-child(2){animation-delay:0.2s} .typing span:nth-child(3){animation-delay:0.4s}
+        @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)} }
+        ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:rgba(255,255,255,0.05)} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:3px}
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <header class="border-b border-white/10 glass sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl">🤖</div>
+                <div>
+                    <h1 class="text-xl font-bold">OpenClaw Dashboard</h1>
+                    <p class="text-xs text-gray-400">Multi-Agent Control Center</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="status" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
+                    <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    <span class="text-sm text-yellow-400">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="glass rounded-2xl p-5 border border-white/10">
+                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Agents</span><span>🤖</span></div>
+                <p class="text-3xl font-bold" id="stat-agents">0</p>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/10">
+                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Sessions</span><span>💬</span></div>
+                <p class="text-3xl font-bold text-blue-400" id="stat-sessions">0</p>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/10">
+                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Gateway</span><span>⚡</span></div>
+                <p class="text-xl font-bold text-green-400" id="stat-gateway">Offline</p>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/10">
+                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Version</span><span>📦</span></div>
+                <p class="text-xl font-bold text-purple-400" id="stat-version">--</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+            <div class="col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">AI Agents</h2>
+                    <div class="flex gap-2">
+                        <button onclick="filter('all')" class="px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30" id="f-all">All</button>
+                        <button onclick="filter('discord')" class="px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400" id="f-discord">Discord</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3" id="agents"></div>
+            </div>
+
+            <div class="col-span-1">
+                <div class="glass rounded-2xl border border-white/10 h-[600px] flex flex-col">
+                    <div class="p-4 border-b border-white/10 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl" id="chat-emoji">🎯</div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold" id="chat-name">Select an Agent</h3>
+                            <p class="text-xs text-gray-400" id="chat-desc">Click an agent to chat</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 space-y-3" id="messages">
+                        <p class="text-center text-gray-500 text-sm py-8">Select an agent to start</p>
+                    </div>
+                    <div class="p-4 border-t border-white/10">
+                        <div class="flex gap-2">
+                            <input type="text" id="input" placeholder="Type a message..." disabled
+                                class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
+                                onkeypress="if(event.key==='Enter')send()">
+                            <button onclick="send()" id="btn-send" disabled class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 rounded-xl transition font-medium">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-lg font-semibold mb-4">Activity</h2>
+            <div class="glass rounded-2xl border border-white/10 divide-y divide-white/5" id="activity">
+                <p class="p-4 text-center text-gray-500 text-sm">No activity yet</p>
+            </div>
+        </div>
+    </main>
+
+<script>
+const API = '/api';
+let agents = [];
+let selected = null;
+let currentFilter = 'all';
+let sending = false;
+const activities = [];
+
+const colors = ['indigo','blue','green','orange','purple','red','pink','emerald','cyan','violet','amber','teal'];
+const gradients = {
+    indigo:'from-indigo-500 to-purple-600', blue:'from-blue-500 to-cyan-600', green:'from-green-500 to-emerald-600',
+    orange:'from-orange-500 to-amber-600', purple:'from-purple-500 to-pink-600', red:'from-red-500 to-rose-600',
+    pink:'from-pink-500 to-rose-600', emerald:'from-emerald-500 to-teal-600', cyan:'from-cyan-500 to-blue-600',
+    violet:'from-violet-500 to-purple-600', amber:'from-amber-500 to-orange-600', teal:'from-teal-500 to-cyan-600'
+};
+
+async function api(path, method='GET', body=null) {
+    const opts = { method, headers: {'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    return r.json();
+}
+
+function cleanName(name, id) {
+    if (!name || name.includes('pick something') || name.includes('_')) return formatId(id);
+    return name;
+}
+
+function cleanEmoji(emoji) {
+    if (!emoji || emoji.includes('pick') || emoji.includes('_') || emoji.includes('*')) return '🤖';
+    // Extract just the emoji
+    const match = emoji.match(/[\p{Emoji}]/gu);
+    return match ? match[0] : '🤖';
+}
+
+function formatId(id) {
+    return id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+async function init() {
+    try {
+        const status = await api('/status');
+        document.getElementById('status').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 pulse"></span><span class="text-sm text-green-400">Connected</span>';
+        document.getElementById('status').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30';
+        document.getElementById('stat-gateway').textContent = 'Online';
+        document.getElementById('stat-version').textContent = status.version || 'v1.0';
+        
+        const data = await api('/agents');
+        agents = (data.agents || []).map((a,i) => ({
+            id: a.id,
+            name: cleanName(a.identity?.name, a.id),
+            emoji: cleanEmoji(a.identity?.emoji),
+            desc: (a.description || 'AI Agent').substring(0,50).replace(/[*_#]/g,''),
+            channel: a.bindings?.discord || null,
+            color: colors[i % colors.length],
+            hasDiscord: !!a.bindings?.discord
+        }));
+        
+        document.getElementById('stat-agents').textContent = agents.length;
+        render();
+        
+        const sessions = await api('/sessions');
+        document.getElementById('stat-sessions').textContent = (sessions.sessions || []).length;
+        
+        log('Dashboard connected', '⚡', 'indigo');
+    } catch(e) {
+        console.error('Init error:', e);
+        document.getElementById('status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-sm text-red-400">Error: '+e.message+'</span>';
+    }
+}
+
+function render() {
+    const list = currentFilter === 'all' ? agents : agents.filter(a => a.hasDiscord);
+    document.getElementById('agents').innerHTML = list.map(a => `
+        <div onclick="select('${a.id}')" class="glass rounded-xl p-4 border cursor-pointer hover:border-indigo-500/50 transition ${selected?.id===a.id?'border-indigo-500 glow':'border-white/10'}" id="card-${a.id}">
+            <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center text-2xl">${a.emoji}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-semibold truncate">${a.name}</h3>
+                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    </div>
+                    <p class="text-xs text-gray-400 truncate">${a.desc}</p>
+                    <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded-full ${a.hasDiscord?'bg-indigo-500/20 text-indigo-400':'bg-gray-500/20 text-gray-500'}">${a.hasDiscord?'Discord':'Internal'}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filter(f) {
+    currentFilter = f;
+    document.getElementById('f-all').className = f==='all' ? 'px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400';
+    document.getElementById('f-discord').className = f==='discord' ? 'px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400';
+    render();
+}
+
+function select(id) {
+    selected = agents.find(a => a.id === id);
+    if (!selected) return;
+    
+    document.getElementById('chat-emoji').textContent = selected.emoji;
+    document.getElementById('chat-emoji').className = `w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-xl`;
+    document.getElementById('chat-name').textContent = selected.name;
+    document.getElementById('chat-desc').textContent = selected.desc;
+    document.getElementById('input').disabled = false;
+    document.getElementById('btn-send').disabled = false;
+    document.getElementById('messages').innerHTML = `<p class="text-center text-gray-500 text-sm slide-up">Chat with <span class="text-white font-medium">${selected.name}</span></p>`;
+    
+    render();
+    log('Selected ' + selected.name, selected.emoji, selected.color);
+}
+
+async function send() {
+    if (sending || !selected) return;
+    const input = document.getElementById('input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    const box = document.getElementById('messages');
+    box.innerHTML += `<div class="flex justify-end slide-up"><div class="bg-indigo-600 rounded-xl rounded-br-none px-4 py-2 max-w-[80%]"><p class="text-sm">${esc(msg)}</p></div></div>`;
+    input.value = '';
+    box.scrollTop = box.scrollHeight;
+    
+    sending = true;
+    box.innerHTML += `<div id="typing" class="flex justify-start slide-up"><div class="flex gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-sm">${selected.emoji}</div><div class="bg-white/10 rounded-xl rounded-bl-none px-4 py-3"><div class="typing"><span></span><span></span><span></span></div></div></div></div>`;
+    box.scrollTop = box.scrollHeight;
+
+    try {
+        const response = await api('/sessions/spawn', 'POST', {
+            agentId: selected.id,
+            task: msg,
+            mode: 'run',
+            runTimeoutSeconds: 120
+        });
+        
+        document.getElementById('typing')?.remove();
+        
+        let reply = response.response || response.result || 'Processing...';
+        if (typeof reply === 'object') reply = JSON.stringify(reply, null, 2);
+        
+        box.innerHTML += `<div class="flex justify-start slide-up"><div class="flex gap-2 max-w-[80%]"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-sm">${selected.emoji}</div><div class="bg-white/10 rounded-xl rounded-bl-none px-4 py-2"><p class="text-sm whitespace-pre-wrap">${esc(reply)}</p></div></div></div>`;
+        log(selected.name + ' responded', selected.emoji, selected.color);
+    } catch(e) {
+        document.getElementById('typing')?.remove();
+        box.innerHTML += `<div class="flex justify-start slide-up"><div class="bg-red-500/20 rounded-xl px-4 py-2 border border-red-500/30"><p class="text-sm text-red-400">Error: ${e.message}</p></div></div>`;
+    }
+    
+    sending = false;
+    box.scrollTop = box.scrollHeight;
+}
+
+function log(text, emoji='⚡', color='indigo') {
+    const time = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+    activities.unshift({ text, emoji, color, time });
+    document.getElementById('activity').innerHTML = activities.slice(0,5).map(a => `
+        <div class="flex items-center gap-4 p-4 hover:bg-white/5 transition">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center text-lg">${a.emoji}</div>
+            <div class="flex-1"><p class="text-sm">${a.text}</p><p class="text-xs text-gray-500">${a.time}</p></div>
+        </div>
+    `).join('');
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+init().catch(e => console.error('Init failed:', e));
+</script>
+</body>
+</html>
