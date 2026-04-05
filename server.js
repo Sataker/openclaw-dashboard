@@ -66,7 +66,17 @@ const discordBindings = {
     'content-creator': '1475657828688724028',
     'content-mentor': '1475789055655677963',
     'english-teacher': '1478717116109684776',
-    'video-factory': '1488605890314764410'
+    'video-factory': '1488605890314764410',
+    'botfai-expert': '1467296333114245355',
+    'ai-engineer': '1466046056641859727',
+    'cyberguard': '1467975450075861309',
+    'codeanalyzer': '1468601544080363777',
+    'brandmaster': '1468285258427535460',
+    'instagram-strategy-expert': '1467575342238531614',
+    'infra': '1466519049071497389',
+    'geoia': '1486827536041382031',
+    'ielts-tutor': '1484165161022390406',
+    'content-factory': '1484576687793639554'
 };
 
 const server = http.createServer(async (req, res) => {
