@@ -127,6 +127,45 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (req.url === '/api/chat' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+                const { agent, message } = data;
+                
+                // Check if agent has Discord binding
+                const channel = discordBindings[agent];
+                if (channel) {
+                    const escapedMsg = message.replace(/"/g, '\\"').replace(/\n/g, ' ');
+                    await runOpenClaw(`message send --channel discord --target ${channel} --message "${escapedMsg}"`);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ 
+                        response: `Message delivered to Discord channel. The agent will respond there.`,
+                        channel: channel,
+                        hasDiscord: true
+                    }));
+                } else {
+                    // For agents without Discord, spawn a quick session
+                    const escapedMsg = message.replace(/"/g, '\\"').replace(/\n/g, ' ');
+                    try {
+                        const output = await runOpenClaw(`sessions spawn --agent ${agent} --task "${escapedMsg}" --mode run --timeout 60`);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ response: output || 'Task processed.' }));
+                    } catch(e) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ response: `Task sent to ${agent}. Check agent workspace for results.` }));
+                    }
+                }
+            } catch(e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+        return;
+    }
+
     if (req.url === '/api/sessions/spawn' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);

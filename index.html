@@ -576,7 +576,12 @@
             try {
                 const data = await api('/agents');
                 if (data.agents) {
-                    agents = data.agents;
+                    // Map bindings to hasDiscord flag
+                    agents = data.agents.map(a => ({
+                        ...a,
+                        hasDiscord: !!(a.bindings && a.bindings.discord),
+                        name: a.identity?.name || a.id
+                    }));
                     document.getElementById('stat-agents').textContent = agents.length;
                     renderAgents();
                     renderChatAgents();
