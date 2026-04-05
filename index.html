@@ -162,7 +162,9 @@ async function init() {
         }));
         
         document.getElementById('stat-agents').textContent = agents.length;
+        console.log('Loaded', agents.length, 'agents');
         render();
+        console.log('Rendered agents');
         
         const sessions = await api('/sessions');
         document.getElementById('stat-sessions').textContent = (sessions.sessions || []).length;
@@ -268,7 +270,12 @@ function log(text, emoji='⚡', color='indigo') {
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
-init().catch(e => console.error('Init failed:', e));
+// Initialize immediately (script is at end of body)
+init().then(() => {
+    console.log('Dashboard ready with', agents.length, 'agents');
+}).catch(e => {
+    console.error('Init failed:', e);
+});
 </script>
 </body>
 </html>
