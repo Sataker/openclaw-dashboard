@@ -1,281 +1,1152 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenClaw Agent Dashboard</title>
+    <title>OpenClaw Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Inter', system-ui, sans-serif; }
-        body { background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%); }
-        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); }
-        .glow { box-shadow: 0 0 30px rgba(99, 102, 241, 0.4); }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        .slide-up { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .typing span { animation: bounce 1.4s infinite; display:inline-block; width:8px; height:8px; background:#6366f1; border-radius:50%; margin:0 2px; }
-        .typing span:nth-child(2){animation-delay:0.2s} .typing span:nth-child(3){animation-delay:0.4s}
-        @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)} }
-        ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:rgba(255,255,255,0.05)} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:3px}
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%); }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+        .glass-dark { background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .glow { box-shadow: 0 0 40px rgba(99, 102, 241, 0.15); }
+        .glow-green { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+        .agent-card { transition: all 0.3s ease; }
+        .agent-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .sidebar-item { transition: all 0.2s ease; }
+        .sidebar-item:hover { background: rgba(99, 102, 241, 0.1); }
+        .sidebar-item.active { background: rgba(99, 102, 241, 0.2); border-left: 3px solid #6366f1; }
+        .chat-bubble { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .kanban-card { cursor: grab; transition: all 0.2s ease; }
+        .kanban-card:active { cursor: grabbing; }
+        .kanban-card:hover { transform: scale(1.02); }
+        .dragging { opacity: 0.5; }
+        .drop-zone { transition: all 0.2s ease; }
+        .drop-zone.drag-over { background: rgba(99, 102, 241, 0.1); border: 2px dashed #6366f1; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        .tab-btn.active { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
     </style>
 </head>
 <body class="min-h-screen text-white">
-    <header class="border-b border-white/10 glass sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <!-- Sidebar -->
+    <div class="fixed left-0 top-0 h-full w-64 glass-dark z-50 flex flex-col">
+        <div class="p-6 border-b border-white/10">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl">🤖</div>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <i data-lucide="bot" class="w-6 h-6"></i>
+                </div>
                 <div>
-                    <h1 class="text-xl font-bold">OpenClaw Dashboard</h1>
-                    <p class="text-xs text-gray-400">Multi-Agent Control Center</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-4">
-                <div id="status" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
-                    <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                    <span class="text-sm text-yellow-400">Connecting...</span>
+                    <h1 class="font-bold text-lg">OpenClaw</h1>
+                    <p class="text-xs text-gray-400">Command Center</p>
                 </div>
             </div>
         </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-6 py-8">
-        <div class="grid grid-cols-4 gap-4 mb-8">
-            <div class="glass rounded-2xl p-5 border border-white/10">
-                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Agents</span><span>🤖</span></div>
-                <p class="text-3xl font-bold" id="stat-agents">0</p>
-            </div>
-            <div class="glass rounded-2xl p-5 border border-white/10">
-                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Sessions</span><span>💬</span></div>
-                <p class="text-3xl font-bold text-blue-400" id="stat-sessions">0</p>
-            </div>
-            <div class="glass rounded-2xl p-5 border border-white/10">
-                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Gateway</span><span>⚡</span></div>
-                <p class="text-xl font-bold text-green-400" id="stat-gateway">Offline</p>
-            </div>
-            <div class="glass rounded-2xl p-5 border border-white/10">
-                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm">Version</span><span>📦</span></div>
-                <p class="text-xl font-bold text-purple-400" id="stat-version">--</p>
+        
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="showView('dashboard')" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="dashboard">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-indigo-400"></i>
+                <span>Dashboard</span>
+            </button>
+            <button onclick="showView('agents')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="agents">
+                <i data-lucide="users" class="w-5 h-5 text-blue-400"></i>
+                <span>Agents</span>
+            </button>
+            <button onclick="showView('chat')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="chat">
+                <i data-lucide="message-square" class="w-5 h-5 text-green-400"></i>
+                <span>Chat</span>
+            </button>
+            <button onclick="showView('kanban')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="kanban">
+                <i data-lucide="kanban" class="w-5 h-5 text-purple-400"></i>
+                <span>Task Board</span>
+            </button>
+            <button onclick="showView('analytics')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="analytics">
+                <i data-lucide="bar-chart-3" class="w-5 h-5 text-yellow-400"></i>
+                <span>Analytics</span>
+            </button>
+            <button onclick="showView('settings')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left" data-view="settings">
+                <i data-lucide="settings" class="w-5 h-5 text-gray-400"></i>
+                <span>Settings</span>
+            </button>
+        </nav>
+        
+        <div class="p-4 border-t border-white/10">
+            <div class="glass rounded-lg p-3">
+                <div class="flex items-center gap-2 mb-2">
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-sm text-gray-400">Gateway Status</span>
+                </div>
+                <p id="gateway-version" class="text-xs text-gray-500">v2026.3.13</p>
             </div>
         </div>
+    </div>
 
-        <div class="grid grid-cols-3 gap-6">
-            <div class="col-span-2">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold">AI Agents</h2>
-                    <div class="flex gap-2">
-                        <button onclick="filter('all')" class="px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30" id="f-all">All</button>
-                        <button onclick="filter('discord')" class="px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400" id="f-discord">Discord</button>
+    <!-- Main Content -->
+    <div class="ml-64 p-8">
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="view">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold">Dashboard</h2>
+                    <p class="text-gray-400 mt-1">Overview of your AI agent ecosystem</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="refreshData()" class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-4 gap-6 mb-8">
+                <div class="glass rounded-2xl p-6 glow-blue">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-lucide="bot" class="w-6 h-6 text-blue-400"></i>
+                        </div>
+                        <span class="text-xs text-green-400 flex items-center gap-1">
+                            <i data-lucide="trending-up" class="w-3 h-3"></i> Active
+                        </span>
                     </div>
+                    <p class="text-3xl font-bold" id="stat-agents">0</p>
+                    <p class="text-gray-400 text-sm">Total Agents</p>
                 </div>
-                <div class="grid grid-cols-2 gap-3" id="agents"></div>
-            </div>
-
-            <div class="col-span-1">
-                <div class="glass rounded-2xl border border-white/10 h-[600px] flex flex-col">
-                    <div class="p-4 border-b border-white/10 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl" id="chat-emoji">🎯</div>
-                        <div class="flex-1">
-                            <h3 class="font-semibold" id="chat-name">Select an Agent</h3>
-                            <p class="text-xs text-gray-400" id="chat-desc">Click an agent to chat</p>
+                
+                <div class="glass rounded-2xl p-6 glow-green">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                            <i data-lucide="activity" class="w-6 h-6 text-green-400"></i>
+                        </div>
+                        <span class="text-xs text-green-400 flex items-center gap-1">
+                            <i data-lucide="zap" class="w-3 h-3"></i> Live
+                        </span>
+                    </div>
+                    <p class="text-3xl font-bold" id="stat-sessions">0</p>
+                    <p class="text-gray-400 text-sm">Active Sessions</p>
+                </div>
+                
+                <div class="glass rounded-2xl p-6 glow-purple">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-lucide="coins" class="w-6 h-6 text-purple-400"></i>
                         </div>
                     </div>
-                    <div class="flex-1 overflow-y-auto p-4 space-y-3" id="messages">
-                        <p class="text-center text-gray-500 text-sm py-8">Select an agent to start</p>
+                    <p class="text-3xl font-bold" id="stat-tokens">0</p>
+                    <p class="text-gray-400 text-sm">Tokens Today</p>
+                </div>
+                
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                            <i data-lucide="list-checks" class="w-6 h-6 text-yellow-400"></i>
+                        </div>
                     </div>
-                    <div class="p-4 border-t border-white/10">
-                        <div class="flex gap-2">
-                            <input type="text" id="input" placeholder="Type a message..." disabled
-                                class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
-                                onkeypress="if(event.key==='Enter')send()">
-                            <button onclick="send()" id="btn-send" disabled class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 rounded-xl transition font-medium">Send</button>
+                    <p class="text-3xl font-bold" id="stat-tasks">0</p>
+                    <p class="text-gray-400 text-sm">Pending Tasks</p>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-400"></i>
+                        Token Usage by Agent
+                    </h3>
+                    <canvas id="tokenChart" height="200"></canvas>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-5 h-5 text-green-400"></i>
+                        Activity (Last 7 Days)
+                    </h3>
+                    <canvas id="activityChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="clock" class="w-5 h-5 text-blue-400"></i>
+                    Recent Activity
+                </h3>
+                <div id="activity-feed" class="space-y-3 max-h-64 overflow-y-auto">
+                    <p class="text-gray-500 text-sm">No recent activity</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agents View -->
+        <div id="view-agents" class="view hidden">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold">Agents</h2>
+                    <p class="text-gray-400 mt-1">Manage your AI agent fleet</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="glass rounded-lg px-4 py-2 flex items-center gap-2">
+                        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                        <input type="text" id="agent-search" placeholder="Search agents..." 
+                               class="bg-transparent outline-none text-sm w-48" oninput="filterAgents()">
+                    </div>
+                    <select id="agent-filter" onchange="filterAgents()" class="glass rounded-lg px-4 py-2 bg-transparent outline-none text-sm">
+                        <option value="all">All Agents</option>
+                        <option value="discord">Discord</option>
+                        <option value="internal">Internal</option>
+                    </select>
+                </div>
+            </div>
+            <div id="agents-grid" class="grid grid-cols-3 gap-6"></div>
+        </div>
+
+        <!-- Chat View -->
+        <div id="view-chat" class="view hidden">
+            <div class="flex h-[calc(100vh-8rem)]">
+                <!-- Agent List -->
+                <div class="w-80 glass-dark rounded-l-2xl border-r border-white/10 flex flex-col">
+                    <div class="p-4 border-b border-white/10">
+                        <div class="glass rounded-lg px-4 py-2 flex items-center gap-2">
+                            <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                            <input type="text" id="chat-search" placeholder="Search..." 
+                                   class="bg-transparent outline-none text-sm w-full" oninput="filterChatAgents()">
+                        </div>
+                    </div>
+                    <div id="chat-agents-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+                </div>
+                
+                <!-- Chat Area -->
+                <div class="flex-1 glass rounded-r-2xl flex flex-col">
+                    <div id="chat-header" class="p-4 border-b border-white/10 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
+                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold">Select an Agent</h3>
+                            <p class="text-xs text-gray-400">Choose an agent to start chatting</p>
+                        </div>
+                    </div>
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div class="flex items-center justify-center h-full text-gray-500">
+                            <div class="text-center">
+                                <i data-lucide="message-circle" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
+                                <p>Select an agent to start a conversation</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chat-input-area" class="p-4 border-t border-white/10 hidden">
+                        <div class="flex gap-3">
+                            <input type="text" id="chat-input" placeholder="Type your message..." 
+                                   class="flex-1 glass rounded-xl px-4 py-3 bg-transparent outline-none"
+                                   onkeypress="if(event.key==='Enter')sendMessage()">
+                            <button onclick="sendMessage()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-xl flex items-center gap-2 transition">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                                Send
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="mt-8">
-            <h2 class="text-lg font-semibold mb-4">Activity</h2>
-            <div class="glass rounded-2xl border border-white/10 divide-y divide-white/5" id="activity">
-                <p class="p-4 text-center text-gray-500 text-sm">No activity yet</p>
+        <!-- Kanban View -->
+        <div id="view-kanban" class="view hidden">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold">Task Board</h2>
+                    <p class="text-gray-400 mt-1">Manage tasks for your agents</p>
+                </div>
+                <button onclick="openTaskModal()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 transition">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    New Task
+                </button>
             </div>
-        </div>
-    </main>
-
-<script>
-const API = '/api';
-let agents = [];
-let selected = null;
-let currentFilter = 'all';
-let sending = false;
-const activities = [];
-
-const colors = ['indigo','blue','green','orange','purple','red','pink','emerald','cyan','violet','amber','teal'];
-const gradients = {
-    indigo:'from-indigo-500 to-purple-600', blue:'from-blue-500 to-cyan-600', green:'from-green-500 to-emerald-600',
-    orange:'from-orange-500 to-amber-600', purple:'from-purple-500 to-pink-600', red:'from-red-500 to-rose-600',
-    pink:'from-pink-500 to-rose-600', emerald:'from-emerald-500 to-teal-600', cyan:'from-cyan-500 to-blue-600',
-    violet:'from-violet-500 to-purple-600', amber:'from-amber-500 to-orange-600', teal:'from-teal-500 to-cyan-600'
-};
-
-async function api(path, method='GET', body=null) {
-    const opts = { method, headers: {'Content-Type':'application/json'} };
-    if (body) opts.body = JSON.stringify(body);
-    const r = await fetch(API + path, opts);
-    return r.json();
-}
-
-function cleanName(name, id) {
-    if (!name || name.includes('pick something') || name.includes('_')) return formatId(id);
-    return name;
-}
-
-function cleanEmoji(emoji) {
-    if (!emoji || emoji.includes('pick') || emoji.includes('_') || emoji.includes('*')) return '🤖';
-    // Extract just the emoji
-    const match = emoji.match(/[\p{Emoji}]/gu);
-    return match ? match[0] : '🤖';
-}
-
-function formatId(id) {
-    return id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-async function init() {
-    try {
-        const status = await api('/status');
-        document.getElementById('status').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 pulse"></span><span class="text-sm text-green-400">Connected</span>';
-        document.getElementById('status').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30';
-        document.getElementById('stat-gateway').textContent = 'Online';
-        document.getElementById('stat-version').textContent = status.version || 'v1.0';
-        
-        const data = await api('/agents');
-        agents = (data.agents || []).map((a,i) => ({
-            id: a.id,
-            name: cleanName(a.identity?.name, a.id),
-            emoji: cleanEmoji(a.identity?.emoji),
-            desc: (a.description || 'AI Agent').substring(0,50).replace(/[*_#]/g,''),
-            channel: a.bindings?.discord || null,
-            color: colors[i % colors.length],
-            hasDiscord: !!a.bindings?.discord
-        }));
-        
-        document.getElementById('stat-agents').textContent = agents.length;
-        console.log('Loaded', agents.length, 'agents');
-        render();
-        console.log('Rendered agents');
-        
-        const sessions = await api('/sessions');
-        document.getElementById('stat-sessions').textContent = (sessions.sessions || []).length;
-        
-        log('Dashboard connected', '⚡', 'indigo');
-    } catch(e) {
-        console.error('Init error:', e);
-        document.getElementById('status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-sm text-red-400">Error: '+e.message+'</span>';
-    }
-}
-
-function render() {
-    const list = currentFilter === 'all' ? agents : agents.filter(a => a.hasDiscord);
-    document.getElementById('agents').innerHTML = list.map(a => `
-        <div onclick="select('${a.id}')" class="glass rounded-xl p-4 border cursor-pointer hover:border-indigo-500/50 transition ${selected?.id===a.id?'border-indigo-500 glow':'border-white/10'}" id="card-${a.id}">
-            <div class="flex items-start gap-3">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center text-2xl">${a.emoji}</div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <h3 class="font-semibold truncate">${a.name}</h3>
-                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            
+            <div class="grid grid-cols-4 gap-6">
+                <!-- Backlog -->
+                <div class="glass rounded-2xl p-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-3 h-3 rounded-full bg-gray-500"></div>
+                        <h3 class="font-semibold">Backlog</h3>
+                        <span class="ml-auto text-xs text-gray-400 kanban-count" data-status="backlog">0</span>
                     </div>
-                    <p class="text-xs text-gray-400 truncate">${a.desc}</p>
-                    <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded-full ${a.hasDiscord?'bg-indigo-500/20 text-indigo-400':'bg-gray-500/20 text-gray-500'}">${a.hasDiscord?'Discord':'Internal'}</span>
+                    <div id="kanban-backlog" class="space-y-3 min-h-[200px] drop-zone" data-status="backlog"></div>
+                </div>
+                
+                <!-- To Do -->
+                <div class="glass rounded-2xl p-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <h3 class="font-semibold">To Do</h3>
+                        <span class="ml-auto text-xs text-gray-400 kanban-count" data-status="todo">0</span>
+                    </div>
+                    <div id="kanban-todo" class="space-y-3 min-h-[200px] drop-zone" data-status="todo"></div>
+                </div>
+                
+                <!-- In Progress -->
+                <div class="glass rounded-2xl p-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <h3 class="font-semibold">In Progress</h3>
+                        <span class="ml-auto text-xs text-gray-400 kanban-count" data-status="progress">0</span>
+                    </div>
+                    <div id="kanban-progress" class="space-y-3 min-h-[200px] drop-zone" data-status="progress"></div>
+                </div>
+                
+                <!-- Done -->
+                <div class="glass rounded-2xl p-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <h3 class="font-semibold">Done</h3>
+                        <span class="ml-auto text-xs text-gray-400 kanban-count" data-status="done">0</span>
+                    </div>
+                    <div id="kanban-done" class="space-y-3 min-h-[200px] drop-zone" data-status="done"></div>
                 </div>
             </div>
         </div>
-    `).join('');
-}
 
-function filter(f) {
-    currentFilter = f;
-    document.getElementById('f-all').className = f==='all' ? 'px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400';
-    document.getElementById('f-discord').className = f==='discord' ? 'px-3 py-1 text-sm rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'px-3 py-1 text-sm rounded-lg bg-white/5 text-gray-400';
-    render();
-}
+        <!-- Analytics View -->
+        <div id="view-analytics" class="view hidden">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold">Analytics</h2>
+                    <p class="text-gray-400 mt-1">Token usage and performance metrics</p>
+                </div>
+                <select id="analytics-period" onchange="updateAnalytics()" class="glass rounded-lg px-4 py-2 bg-transparent outline-none text-sm">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+            </div>
 
-function select(id) {
-    selected = agents.find(a => a.id === id);
-    if (!selected) return;
-    
-    document.getElementById('chat-emoji').textContent = selected.emoji;
-    document.getElementById('chat-emoji').className = `w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-xl`;
-    document.getElementById('chat-name').textContent = selected.name;
-    document.getElementById('chat-desc').textContent = selected.desc;
-    document.getElementById('input').disabled = false;
-    document.getElementById('btn-send').disabled = false;
-    document.getElementById('messages').innerHTML = `<p class="text-center text-gray-500 text-sm slide-up">Chat with <span class="text-white font-medium">${selected.name}</span></p>`;
-    
-    render();
-    log('Selected ' + selected.name, selected.emoji, selected.color);
-}
+            <!-- Token Stats -->
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                            <i data-lucide="arrow-up" class="w-5 h-5 text-indigo-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold" id="analytics-input">0</p>
+                            <p class="text-sm text-gray-400">Input Tokens</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <i data-lucide="arrow-down" class="w-5 h-5 text-green-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold" id="analytics-output">0</p>
+                            <p class="text-sm text-gray-400">Output Tokens</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                            <i data-lucide="dollar-sign" class="w-5 h-5 text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold" id="analytics-cost">$0.00</p>
+                            <p class="text-sm text-gray-400">Estimated Cost</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-async function send() {
-    if (sending || !selected) return;
-    const input = document.getElementById('input');
-    const msg = input.value.trim();
-    if (!msg) return;
-    
-    const box = document.getElementById('messages');
-    box.innerHTML += `<div class="flex justify-end slide-up"><div class="bg-indigo-600 rounded-xl rounded-br-none px-4 py-2 max-w-[80%]"><p class="text-sm">${esc(msg)}</p></div></div>`;
-    input.value = '';
-    box.scrollTop = box.scrollHeight;
-    
-    sending = true;
-    box.innerHTML += `<div id="typing" class="flex justify-start slide-up"><div class="flex gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-sm">${selected.emoji}</div><div class="bg-white/10 rounded-xl rounded-bl-none px-4 py-3"><div class="typing"><span></span><span></span><span></span></div></div></div></div>`;
-    box.scrollTop = box.scrollHeight;
+            <!-- Agent Usage Table -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="table" class="w-5 h-5 text-blue-400"></i>
+                    Token Usage by Agent
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-gray-400 text-sm border-b border-white/10">
+                                <th class="pb-3">Agent</th>
+                                <th class="pb-3">Input Tokens</th>
+                                <th class="pb-3">Output Tokens</th>
+                                <th class="pb-3">Total</th>
+                                <th class="pb-3">Cost</th>
+                                <th class="pb-3">Usage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analytics-table" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-    try {
-        const response = await api('/sessions/spawn', 'POST', {
-            agentId: selected.id,
-            task: msg,
-            mode: 'run',
-            runTimeoutSeconds: 120
+        <!-- Settings View -->
+        <div id="view-settings" class="view hidden">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold">Settings</h2>
+                <p class="text-gray-400 mt-1">Configure your command center</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-6">
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="server" class="w-5 h-5 text-indigo-400"></i>
+                        Gateway Configuration
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-sm text-gray-400 block mb-2">Gateway URL</label>
+                            <input type="text" value="localhost:18789" disabled
+                                   class="w-full glass rounded-lg px-4 py-2 bg-transparent text-gray-500">
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-400 block mb-2">Version</label>
+                            <input type="text" id="settings-version" value="" disabled
+                                   class="w-full glass rounded-lg px-4 py-2 bg-transparent text-gray-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="palette" class="w-5 h-5 text-purple-400"></i>
+                        Appearance
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">Dark Mode</span>
+                            <button class="w-12 h-6 rounded-full bg-indigo-600 relative">
+                                <div class="absolute right-1 top-1 w-4 h-4 rounded-full bg-white"></div>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">Compact View</span>
+                            <button onclick="toggleCompact()" id="compact-toggle" class="w-12 h-6 rounded-full bg-gray-600 relative">
+                                <div class="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-all"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-6 col-span-2">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="database" class="w-5 h-5 text-green-400"></i>
+                        Data Management
+                    </h3>
+                    <div class="flex gap-4">
+                        <button onclick="exportData()" class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            Export Tasks
+                        </button>
+                        <button onclick="importData()" class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            Import Tasks
+                        </button>
+                        <button onclick="clearData()" class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-500/20 text-red-400 transition">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="glass rounded-2xl p-6 w-full max-w-lg mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold">New Task</h3>
+                <button onclick="closeTaskModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-gray-400 block mb-2">Task Title</label>
+                    <input type="text" id="task-title" placeholder="Enter task title..."
+                           class="w-full glass rounded-lg px-4 py-3 bg-transparent outline-none">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 block mb-2">Description</label>
+                    <textarea id="task-desc" rows="3" placeholder="Describe the task..."
+                              class="w-full glass rounded-lg px-4 py-3 bg-transparent outline-none resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 block mb-2">Assign to Agent</label>
+                    <select id="task-agent" class="w-full glass rounded-lg px-4 py-3 bg-transparent outline-none">
+                        <option value="">Select agent...</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400 block mb-2">Priority</label>
+                        <select id="task-priority" class="w-full glass rounded-lg px-4 py-3 bg-transparent outline-none">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400 block mb-2">Due Date</label>
+                        <input type="date" id="task-due" class="w-full glass rounded-lg px-4 py-3 bg-transparent outline-none">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button onclick="closeTaskModal()" class="flex-1 glass px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                        Cancel
+                    </button>
+                    <button onclick="createTask()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg transition">
+                        Create Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let agents = [];
+        let tasks = JSON.parse(localStorage.getItem('openclaw-tasks') || '[]');
+        let chatHistory = {};
+        let selectedAgent = null;
+        let tokenUsage = {};
+        let activityLog = [];
+
+        // Icons for agent types
+        const agentIcons = {
+            'orchestrator': 'crown',
+            'ai-engineer': 'code-2',
+            'dba': 'database',
+            'infra': 'server',
+            'samurai': 'sword',
+            'sales-analyst': 'trending-up',
+            'video-pipeline': 'video',
+            'video-analyzer': 'play-circle',
+            'brandmaster': 'palette',
+            'codeanalyzer': 'file-code',
+            'cyberguard': 'shield',
+            'uchat': 'message-circle',
+            'casual-br': 'smile',
+            'content-creator': 'pen-tool',
+            'content-mentor': 'graduation-cap',
+            'english-teacher': 'book-open',
+            'botfai-expert': 'bot',
+            'ielts-tutor': 'award',
+            'geoia': 'map-pin',
+            'content-factory': 'factory',
+            'default': 'user'
+        };
+
+        const agentColors = {
+            'orchestrator': 'from-purple-500 to-indigo-600',
+            'ai-engineer': 'from-blue-500 to-cyan-600',
+            'dba': 'from-green-500 to-emerald-600',
+            'infra': 'from-orange-500 to-red-600',
+            'samurai': 'from-red-500 to-pink-600',
+            'sales-analyst': 'from-yellow-500 to-orange-600',
+            'cyberguard': 'from-slate-500 to-zinc-600',
+            'default': 'from-gray-500 to-gray-600'
+        };
+
+        // API helper
+        async function api(path, opts = {}) {
+            try {
+                const res = await fetch('/api' + path, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...opts
+                });
+                return await res.json();
+            } catch (e) {
+                console.error('API Error:', e);
+                return { error: e.message };
+            }
+        }
+
+        // Initialize
+        async function init() {
+            try {
+                const data = await api('/agents');
+                if (data.agents) {
+                    agents = data.agents;
+                    document.getElementById('stat-agents').textContent = agents.length;
+                    renderAgents();
+                    renderChatAgents();
+                    populateAgentSelect();
+                }
+
+                const sessions = await api('/sessions');
+                if (sessions.sessions) {
+                    document.getElementById('stat-sessions').textContent = sessions.sessions.length;
+                }
+
+                document.getElementById('gateway-version').textContent = 'v2026.3.13';
+                document.getElementById('settings-version').textContent = '2026.3.13';
+
+                // Load tasks
+                renderKanban();
+                updateTaskStats();
+
+                // Initialize charts
+                initCharts();
+
+                // Add activity
+                addActivity('Dashboard connected', 'system');
+
+                lucide.createIcons();
+            } catch (e) {
+                console.error('Init failed:', e);
+            }
+        }
+
+        // Views
+        function showView(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+            document.getElementById('view-' + view).classList.remove('hidden');
+            
+            document.querySelectorAll('.sidebar-item').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.view === view) btn.classList.add('active');
+            });
+
+            if (view === 'analytics') updateAnalytics();
+            lucide.createIcons();
+        }
+
+        // Render agents grid
+        function renderAgents() {
+            const grid = document.getElementById('agents-grid');
+            const search = document.getElementById('agent-search')?.value.toLowerCase() || '';
+            const filter = document.getElementById('agent-filter')?.value || 'all';
+
+            const filtered = agents.filter(a => {
+                const matchSearch = a.id.toLowerCase().includes(search) || 
+                                   (a.name || '').toLowerCase().includes(search);
+                const matchFilter = filter === 'all' || 
+                                   (filter === 'discord' && a.hasDiscord) ||
+                                   (filter === 'internal' && !a.hasDiscord);
+                return matchSearch && matchFilter;
+            });
+
+            grid.innerHTML = filtered.map(a => {
+                const icon = agentIcons[a.id] || agentIcons.default;
+                const color = agentColors[a.id] || agentColors.default;
+                const name = cleanName(a.name || a.id);
+                const usage = tokenUsage[a.id] || { input: 0, output: 0 };
+                
+                return `
+                    <div class="agent-card glass rounded-2xl p-6 cursor-pointer" onclick="selectAgentForChat('${a.id}')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-14 h-14 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center">
+                                <i data-lucide="${icon}" class="w-7 h-7"></i>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded-full ${a.hasDiscord ? 'bg-indigo-500/20 text-indigo-400' : 'bg-gray-500/20 text-gray-400'}">
+                                ${a.hasDiscord ? 'Discord' : 'Internal'}
+                            </span>
+                        </div>
+                        <h3 class="font-semibold text-lg mb-1">${name}</h3>
+                        <p class="text-sm text-gray-400 mb-4">${a.description || 'AI Agent'}</p>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="coins" class="w-3 h-3"></i>
+                                ${formatNumber(usage.input + usage.output)} tokens
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="message-square" class="w-3 h-3"></i>
+                                Chat
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function filterAgents() { renderAgents(); }
+
+        // Chat
+        function renderChatAgents() {
+            const list = document.getElementById('chat-agents-list');
+            const search = document.getElementById('chat-search')?.value.toLowerCase() || '';
+
+            const filtered = agents.filter(a => 
+                a.id.toLowerCase().includes(search) || (a.name || '').toLowerCase().includes(search)
+            );
+
+            list.innerHTML = filtered.map(a => {
+                const icon = agentIcons[a.id] || agentIcons.default;
+                const color = agentColors[a.id] || agentColors.default;
+                const name = cleanName(a.name || a.id);
+                const isSelected = selectedAgent === a.id;
+                
+                return `
+                    <button onclick="selectAgentForChat('${a.id}')" 
+                            class="w-full flex items-center gap-3 p-3 rounded-lg transition ${isSelected ? 'bg-indigo-500/20' : 'hover:bg-white/5'}">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="${icon}" class="w-5 h-5"></i>
+                        </div>
+                        <div class="text-left flex-1 min-w-0">
+                            <p class="font-medium truncate">${name}</p>
+                            <p class="text-xs text-gray-400 truncate">${a.hasDiscord ? 'Discord' : 'Internal'}</p>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function filterChatAgents() { renderChatAgents(); }
+
+        function selectAgentForChat(agentId) {
+            selectedAgent = agentId;
+            const agent = agents.find(a => a.id === agentId);
+            const icon = agentIcons[agentId] || agentIcons.default;
+            const color = agentColors[agentId] || agentColors.default;
+            const name = cleanName(agent?.name || agentId);
+
+            document.getElementById('chat-header').innerHTML = `
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center">
+                    <i data-lucide="${icon}" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">${name}</h3>
+                    <p class="text-xs text-gray-400">${agent?.hasDiscord ? 'Connected to Discord' : 'Internal Agent'}</p>
+                </div>
+            `;
+
+            document.getElementById('chat-input-area').classList.remove('hidden');
+            renderChatMessages();
+            renderChatAgents();
+            showView('chat');
+            lucide.createIcons();
+        }
+
+        function renderChatMessages() {
+            const container = document.getElementById('chat-messages');
+            const history = chatHistory[selectedAgent] || [];
+
+            if (history.length === 0) {
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-full text-gray-500">
+                        <div class="text-center">
+                            <i data-lucide="message-circle" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
+                            <p>Start a conversation with this agent</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = history.map(msg => `
+                    <div class="chat-bubble flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-[70%] ${msg.role === 'user' ? 'bg-indigo-600' : 'glass'} rounded-2xl px-4 py-3">
+                            <p class="text-sm">${escapeHtml(msg.content)}</p>
+                            <p class="text-xs ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-500'} mt-1">${msg.time}</p>
+                        </div>
+                    </div>
+                `).join('');
+                container.scrollTop = container.scrollHeight;
+            }
+
+            lucide.createIcons();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message || !selectedAgent) return;
+
+            if (!chatHistory[selectedAgent]) chatHistory[selectedAgent] = [];
+            chatHistory[selectedAgent].push({
+                role: 'user',
+                content: message,
+                time: new Date().toLocaleTimeString()
+            });
+
+            input.value = '';
+            renderChatMessages();
+
+            // Send to API
+            const res = await api('/chat', {
+                method: 'POST',
+                body: JSON.stringify({ agent: selectedAgent, message })
+            });
+
+            // Add response
+            chatHistory[selectedAgent].push({
+                role: 'assistant',
+                content: res.response || 'Message sent to agent',
+                time: new Date().toLocaleTimeString()
+            });
+
+            renderChatMessages();
+            addActivity(`Message sent to ${selectedAgent}`, 'chat');
+
+            // Simulate token usage
+            const tokens = Math.floor(message.length * 1.3);
+            if (!tokenUsage[selectedAgent]) tokenUsage[selectedAgent] = { input: 0, output: 0 };
+            tokenUsage[selectedAgent].input += tokens;
+            tokenUsage[selectedAgent].output += Math.floor(tokens * 0.8);
+            updateTokenStats();
+        }
+
+        // Kanban
+        function renderKanban() {
+            const statuses = ['backlog', 'todo', 'progress', 'done'];
+            
+            statuses.forEach(status => {
+                const container = document.getElementById('kanban-' + status);
+                const statusTasks = tasks.filter(t => t.status === status);
+                
+                container.innerHTML = statusTasks.map(task => {
+                    const agent = agents.find(a => a.id === task.agent);
+                    const priorityColors = {
+                        low: 'bg-gray-500',
+                        medium: 'bg-yellow-500',
+                        high: 'bg-red-500'
+                    };
+                    
+                    return `
+                        <div class="kanban-card glass-dark rounded-xl p-4" draggable="true" data-id="${task.id}"
+                             ondragstart="dragStart(event)" ondragend="dragEnd(event)">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="w-2 h-2 rounded-full ${priorityColors[task.priority]}"></span>
+                                <button onclick="deleteTask('${task.id}')" class="text-gray-500 hover:text-red-400">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+                            <h4 class="font-medium text-sm mb-2">${escapeHtml(task.title)}</h4>
+                            ${task.description ? `<p class="text-xs text-gray-400 mb-3">${escapeHtml(task.description)}</p>` : ''}
+                            <div class="flex items-center justify-between text-xs text-gray-500">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="user" class="w-3 h-3"></i>
+                                    ${agent ? cleanName(agent.name || agent.id) : 'Unassigned'}
+                                </span>
+                                ${task.due ? `<span>${task.due}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.querySelector(`.kanban-count[data-status="${status}"]`).textContent = statusTasks.length;
+            });
+
+            // Setup drop zones
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.ondragover = e => { e.preventDefault(); zone.classList.add('drag-over'); };
+                zone.ondragleave = () => zone.classList.remove('drag-over');
+                zone.ondrop = e => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const newStatus = zone.dataset.status;
+                    moveTask(taskId, newStatus);
+                };
+            });
+
+            lucide.createIcons();
+        }
+
+        function dragStart(e) {
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', e.target.dataset.id);
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function moveTask(taskId, newStatus) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.status = newStatus;
+                saveTasks();
+                renderKanban();
+                addActivity(`Task "${task.title}" moved to ${newStatus}`, 'task');
+            }
+        }
+
+        function openTaskModal() {
+            document.getElementById('task-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-modal').classList.add('hidden');
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-desc').value = '';
+            document.getElementById('task-agent').value = '';
+            document.getElementById('task-priority').value = 'medium';
+            document.getElementById('task-due').value = '';
+        }
+
+        function populateAgentSelect() {
+            const select = document.getElementById('task-agent');
+            select.innerHTML = '<option value="">Select agent...</option>' +
+                agents.map(a => `<option value="${a.id}">${cleanName(a.name || a.id)}</option>`).join('');
+        }
+
+        function createTask() {
+            const title = document.getElementById('task-title').value.trim();
+            if (!title) return alert('Please enter a task title');
+
+            const task = {
+                id: Date.now().toString(),
+                title,
+                description: document.getElementById('task-desc').value.trim(),
+                agent: document.getElementById('task-agent').value,
+                priority: document.getElementById('task-priority').value,
+                due: document.getElementById('task-due').value,
+                status: 'backlog',
+                created: new Date().toISOString()
+            };
+
+            tasks.push(task);
+            saveTasks();
+            renderKanban();
+            updateTaskStats();
+            closeTaskModal();
+            addActivity(`Task "${title}" created`, 'task');
+        }
+
+        function deleteTask(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            saveTasks();
+            renderKanban();
+            updateTaskStats();
+        }
+
+        function saveTasks() {
+            localStorage.setItem('openclaw-tasks', JSON.stringify(tasks));
+        }
+
+        function updateTaskStats() {
+            const pending = tasks.filter(t => t.status !== 'done').length;
+            document.getElementById('stat-tasks').textContent = pending;
+        }
+
+        // Charts
+        let tokenChart, activityChart;
+
+        function initCharts() {
+            // Token usage chart
+            const tokenCtx = document.getElementById('tokenChart').getContext('2d');
+            tokenChart = new Chart(tokenCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Orchestrator', 'AI Engineer', 'DBA', 'Others'],
+                    datasets: [{
+                        data: [35, 25, 20, 20],
+                        backgroundColor: ['#8b5cf6', '#3b82f6', '#22c55e', '#6b7280'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af', padding: 20 }
+                        }
+                    }
+                }
+            });
+
+            // Activity chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            activityChart = new Chart(activityCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Messages',
+                        data: [12, 19, 8, 15, 22, 10, 5],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+                    }
+                }
+            });
+        }
+
+        function updateTokenStats() {
+            let totalTokens = 0;
+            Object.values(tokenUsage).forEach(u => {
+                totalTokens += (u.input || 0) + (u.output || 0);
+            });
+            document.getElementById('stat-tokens').textContent = formatNumber(totalTokens);
+        }
+
+        // Analytics
+        function updateAnalytics() {
+            let totalInput = 0, totalOutput = 0;
+            Object.values(tokenUsage).forEach(u => {
+                totalInput += u.input || 0;
+                totalOutput += u.output || 0;
+            });
+
+            document.getElementById('analytics-input').textContent = formatNumber(totalInput);
+            document.getElementById('analytics-output').textContent = formatNumber(totalOutput);
+            
+            const cost = ((totalInput * 0.003) + (totalOutput * 0.015)) / 1000;
+            document.getElementById('analytics-cost').textContent = '$' + cost.toFixed(2);
+
+            // Update table
+            const table = document.getElementById('analytics-table');
+            const sortedAgents = [...agents].sort((a, b) => {
+                const usageA = (tokenUsage[a.id]?.input || 0) + (tokenUsage[a.id]?.output || 0);
+                const usageB = (tokenUsage[b.id]?.input || 0) + (tokenUsage[b.id]?.output || 0);
+                return usageB - usageA;
+            }).slice(0, 10);
+
+            const maxUsage = Math.max(...sortedAgents.map(a => 
+                (tokenUsage[a.id]?.input || 0) + (tokenUsage[a.id]?.output || 0)
+            ), 1);
+
+            table.innerHTML = sortedAgents.map(a => {
+                const usage = tokenUsage[a.id] || { input: 0, output: 0 };
+                const total = usage.input + usage.output;
+                const agentCost = ((usage.input * 0.003) + (usage.output * 0.015)) / 1000;
+                const percentage = (total / maxUsage) * 100;
+
+                return `
+                    <tr class="border-b border-white/5">
+                        <td class="py-3">${cleanName(a.name || a.id)}</td>
+                        <td class="py-3">${formatNumber(usage.input)}</td>
+                        <td class="py-3">${formatNumber(usage.output)}</td>
+                        <td class="py-3">${formatNumber(total)}</td>
+                        <td class="py-3">$${agentCost.toFixed(4)}</td>
+                        <td class="py-3">
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-indigo-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Activity
+        function addActivity(message, type) {
+            const icons = {
+                system: 'info',
+                chat: 'message-square',
+                task: 'check-square'
+            };
+            const colors = {
+                system: 'text-blue-400',
+                chat: 'text-green-400',
+                task: 'text-purple-400'
+            };
+
+            activityLog.unshift({
+                message,
+                type,
+                time: new Date().toLocaleTimeString()
+            });
+
+            if (activityLog.length > 50) activityLog.pop();
+
+            const feed = document.getElementById('activity-feed');
+            feed.innerHTML = activityLog.map(a => `
+                <div class="flex items-center gap-3 text-sm">
+                    <i data-lucide="${icons[a.type]}" class="w-4 h-4 ${colors[a.type]}"></i>
+                    <span class="flex-1">${a.message}</span>
+                    <span class="text-gray-500 text-xs">${a.time}</span>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        // Utilities
+        function cleanName(name) {
+            return (name || '').replace(/\$\{[^}]+\}/g, '').replace(/[{}$]/g, '').trim() || 'Agent';
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        async function refreshData() {
+            await init();
+            addActivity('Data refreshed', 'system');
+        }
+
+        function exportData() {
+            const data = JSON.stringify({ tasks, tokenUsage, chatHistory }, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'openclaw-data.json';
+            a.click();
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (data.tasks) tasks = data.tasks;
+                if (data.tokenUsage) tokenUsage = data.tokenUsage;
+                if (data.chatHistory) chatHistory = data.chatHistory;
+                saveTasks();
+                renderKanban();
+                updateTaskStats();
+                addActivity('Data imported', 'system');
+            };
+            input.click();
+        }
+
+        function clearData() {
+            if (confirm('Are you sure you want to clear all data?')) {
+                tasks = [];
+                tokenUsage = {};
+                chatHistory = {};
+                localStorage.removeItem('openclaw-tasks');
+                renderKanban();
+                updateTaskStats();
+                addActivity('All data cleared', 'system');
+            }
+        }
+
+        // Initialize
+        init().then(() => {
+            console.log('Dashboard ready with', agents.length, 'agents');
+        }).catch(e => {
+            console.error('Init failed:', e);
         });
-        
-        document.getElementById('typing')?.remove();
-        
-        let reply = response.response || response.result || 'Processing...';
-        if (typeof reply === 'object') reply = JSON.stringify(reply, null, 2);
-        
-        box.innerHTML += `<div class="flex justify-start slide-up"><div class="flex gap-2 max-w-[80%]"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${gradients[selected.color]} flex items-center justify-center text-sm">${selected.emoji}</div><div class="bg-white/10 rounded-xl rounded-bl-none px-4 py-2"><p class="text-sm whitespace-pre-wrap">${esc(reply)}</p></div></div></div>`;
-        log(selected.name + ' responded', selected.emoji, selected.color);
-    } catch(e) {
-        document.getElementById('typing')?.remove();
-        box.innerHTML += `<div class="flex justify-start slide-up"><div class="bg-red-500/20 rounded-xl px-4 py-2 border border-red-500/30"><p class="text-sm text-red-400">Error: ${e.message}</p></div></div>`;
-    }
-    
-    sending = false;
-    box.scrollTop = box.scrollHeight;
-}
-
-function log(text, emoji='⚡', color='indigo') {
-    const time = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-    activities.unshift({ text, emoji, color, time });
-    document.getElementById('activity').innerHTML = activities.slice(0,5).map(a => `
-        <div class="flex items-center gap-4 p-4 hover:bg-white/5 transition">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center text-lg">${a.emoji}</div>
-            <div class="flex-1"><p class="text-sm">${a.text}</p><p class="text-xs text-gray-500">${a.time}</p></div>
-        </div>
-    `).join('');
-}
-
-function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-
-// Initialize immediately (script is at end of body)
-init().then(() => {
-    console.log('Dashboard ready with', agents.length, 'agents');
-}).catch(e => {
-    console.error('Init failed:', e);
-});
-</script>
+    </script>
 </body>
 </html>
